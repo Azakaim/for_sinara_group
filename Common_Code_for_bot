@@ -1,0 +1,420 @@
+Commone Code
+
+using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Data;
+using System.Drawing;
+using System.Linq;
+using System.Text;
+using System.Threading;
+using System.IO;
+using System.Text.RegularExpressions;
+using ZennoLab.CommandCenter;
+using ZennoLab.InterfacesLibrary;
+using ZennoLab.InterfacesLibrary.ProjectModel;
+using ZennoLab.InterfacesLibrary.ProjectModel.Collections;
+using ZennoLab.InterfacesLibrary.ProjectModel.Enums;
+using ZennoLab.Macros;
+using Global.ZennoExtensions;
+using ZennoLab.Emulation;
+using ZennoLab.CommandCenter.TouchEvents;
+using ZennoLab.CommandCenter.FullEmulation;
+using ZennoLab.InterfacesLibrary.Enums;
+using OfficeOpenXml;
+using OfficeOpenXml.Style;
+
+namespace ZennoLab.OwnCode
+{
+	
+	/// <summary>
+	/// A simple class of the common code
+	/// </summary>
+	public class CommonCode
+	{
+		/// <summary>
+		/// Lock this object to mark part of code for single thread execution
+		///</summary>
+		public static object SyncObject = new object();
+
+		//Instance
+		public Instance instance{get;set;}
+		//project
+		public IZennoPosterProjectModel project{get;set;}
+		//dict
+		public Dictionary<object,object>DICT{set;get;}
+		// Insert your code here
+		Random rand = new Random();
+		//Table Excel
+		public ExcelPackage pack {get;set;}
+		public List<ExcelWorksheet> packgage = new List<ExcelWorksheet>();
+		
+		public int num;
+		/// <summary>
+		/// finde and clic only element
+		/// </summary>
+		/// <param name="x_path">string value x_path</param>
+		/// <param name="act"> Active Tab </param>
+		public void FindElementClic(string x_path = "",Tab act = null)
+		{
+			act.WaitDownloading();
+			//value
+			act.FullEmulationMouseSetOptions(rand.Next(4,5),rand.Next(4,5),rand.Next(4,5), 5, 5, 5);
+			HtmlElement input ;
+			int count = 0;
+			do
+			{
+				//find element
+				input = act.FindElementByXPath(x_path,0);
+				//microsleep
+				Thread.Sleep(rand.Next(1111));count++;
+			}while(input.IsVoid && count < 10);
+			if(input.IsVoid) throw new Exception($"HtmlElement NOT FINDE :xpath--{x_path}");
+			//clic
+			act.WaitDownloading();
+			input.Click();
+			act.WaitDownloading();
+			
+		}
+		/// <summary>
+		/// Clic and input info
+		/// </summary>
+		/// <param name="x_path"></param>
+		/// <param name="act"></param>
+		/// <param name="ozon_info"> value signin</param>
+		public void FindElementClic(string x_path = "",Tab act = null , string ozon_info = null)
+		{
+			act.WaitDownloading();
+			HtmlElement input;
+			int count = 0;
+			do
+			{
+				input = act.FindElementByXPath(x_path,0);
+				//microsleep
+				Thread.Sleep(rand.Next(1111));count++;
+			}while(input.IsVoid && count < 10);
+			if(!input.IsVoid)input.Click();
+			else{throw new Exception("!HtmlElement input mail or pass");}
+			Thread.Sleep(rand.Next(300,900));
+			input.SetValue(ozon_info,"SuperEmulation");
+		}
+		/// <summary>
+		/// get list excel worck sheet 
+		/// </summary>
+		/// <param name="path_dir">path for excel document</param>
+		/// <param name="sheet">count sheet excel</param>
+		/// <param name="pack">ref this ExcelPackage  </param>
+		/// <returns> List<ExcelWorksheet> </returns>
+		public List<ExcelWorksheet> PackGage(int sheet)
+		{
+			for(int i = 1;i <= sheet;i++)
+			{
+				this.packgage.Add(this.pack.Workbook.Worksheets[i]);
+			}
+			return this.packgage;
+		}
+		/// <summary>
+		/// define count page
+		/// </summary>
+		/// <param name="num"></param>
+		public int CountPageOfOzon(int dimension_rows_mail)
+		{
+			int _val = 0;
+			try
+			{
+				_val = this.num + dimension_rows_mail;
+			}
+			catch(Exception e)
+			{
+				throw new Exception(e.Message);
+			}
+			return _val;
+		}
+		
+		/// <summary>
+		/// scroll mouse
+		/// </summary>
+		/// <param name="I">start move mouse in window</param>
+		/// <param name="Y">end move mouse in window</param>
+		public void Scroll(Tab act,int I = 0,int Y = 100)
+		{
+			//Иницируем начало цикла со скроллингом
+			while(true)
+			{
+			    //Прокрутка
+			    act.FullEmulationMouseWheel(0,Y);
+				Thread.Sleep(new Random().Next(300,500));
+				act.WaitDownloading();
+				//Положение мыши по оси Y
+			    int posY = act.FullEmulationMouseCurrentPosition.Y;
+				//Условие, если положение мыши по оси Y больше точки отсчета, то скроллим дальше
+			    if(posY > I){I = posY;Y += 100;}
+			    else{break;}
+		    }
+		}
+		/// <summary>
+		/// Func define count stars
+		/// </summary>
+		/// <param name="regex">regex for collection_reviews</param>
+		/// <param name="collection_reviews">collection reviews</param>
+		/// <param name="regex">regex for Status</param>
+		/// <param name="Status">collection status</param>
+		/// <param name="field_reviews_result">field reviews</param>
+		/// <param name="act"></param>
+		/// <param name="button_path"></param>
+		/// <param name="field_path_review"></param>
+		/// <param name="button_send_review"></param>
+		/// <param name="close_path"></param>
+		/// <param name="Tabl"></param>
+		public void CountStars(string regex1,HtmlElementCollection collection_reviews,string regex2,
+							   HtmlElementCollection Status,HtmlElementCollection collection_field_reviews,
+							   Tab act,string button_path,string field_path_review,
+							   string button_send_review ,string close_path)
+		{
+			int count = 0;
+			var reg = new Regex(regex1);
+			string match_starz = String.Empty;
+			string match_stat = String.Empty;
+			List<string> match_stars = new List<string>();
+			List<Match> Stars = new List<Match>();
+			List<string>count_stars = new List<string>();
+			List<HtmlElement> list_for_html_field_review = new List<HtmlElement>();
+			List<HtmlElement> coll_review_for_work = new List<HtmlElement>();
+			//define work list
+			foreach(HtmlElement it in collection_field_reviews)list_for_html_field_review.Add(it);
+			foreach(HtmlElement el in collection_reviews)coll_review_for_work.Add(el);
+			#region CHECK collection_reviews
+			//CHECK for match collection
+//			MatchCollection chec;
+//			int che = 1;
+//			foreach(HtmlElement it in collection_reviews)
+//			{
+									
+//			chec = Regex.Matches($"{it.OuterHtml}",regex1);
+//			project.SendInfoToLog($"--------------{che++}");
+//			foreach(Match v in chec)
+//			{
+//				project.SendInfoToLog(v.Value);
+//			}
+//				project.SendInfoToLog($"--------------{che++}");
+//				chec = Regex.Matches($"{it.OuterHtml}",regex1);
+//				foreach(Match v in chec)project.SendInfoToLog(v.Value);
+//			}
+			//CHECK list el Html collection_______________________
+//			while(true)
+//			{
+//				foreach(HtmlElement it in list_for_html)
+//				{
+//					project.SendInfoToLog(it.OuterHtml);
+//					project.SendInfoToLog(list_for_html.IndexOf(it) + "--индекс элемента");
+//					list_for_html.Remove(it);
+//					break;
+//				}
+//			}
+			#endregion
+			//______________________________________________STATUS
+			//status
+			foreach(HtmlElement element in Status)
+			{
+			 match_stat = Regex.Match($"{element.OuterHtml}",regex2).Value;
+			#region	CHECK STATUS
+			//CHECK STATUS
+//			foreach(HtmlElement val in htmlel_new)project.SendInfoToLog("this is STATUS : "+val.OuterHtml);
+			#endregion	
+				foreach(HtmlElement item in coll_review_for_work)
+				{
+					//regex for count stars
+					match_starz = Regex.Matches($"{item.OuterHtml}",regex1)[4].Value;//5 stars
+
+					if(match_starz == "black-star--sprite")//5 stars
+					{
+						if(match_stat == "Новый" || match_stat == "Просмотренный")
+						{
+							ClicElementReview(5,act,button_path,field_path_review,
+										button_send_review ,close_path,list_for_html_field_review);
+						}
+					}
+					else if(match_starz != "black-star--sprite")
+					{
+						Stars = reg.Matches(item.OuterHtml).Cast<Match>().ToList();
+						count_stars = (from Item in Stars
+									   where Item.Value == "star--sprite"
+									   select Item.Value).ToList();
+						count = count_stars.Count;
+						//count of stars in review
+						switch(count)
+						{
+							case 1:
+								if(match_stat == "Новый" || match_stat == "Просмотренный")
+								{
+									ClicElementReview(4,act,button_path,field_path_review,
+										button_send_review ,close_path,list_for_html_field_review);
+								}break;//4 stars
+							case 2:
+								if(match_stat == "Новый" || match_stat == "Просмотренный")
+								{
+									ClicElementReview(3,act,button_path,field_path_review,
+										button_send_review ,close_path,list_for_html_field_review);//3 stars
+								}break;//3 stars
+							
+						}
+					}
+					list_for_html_field_review.Remove(list_for_html_field_review.First());
+					coll_review_for_work.Remove(item);
+					break;
+				}/*Collection reviews*/
+			}/*Status*/
+		}
+		internal void ClicElementReview(int how_many_stars,Tab act,string button_path,string field_path_review,
+										string button_send_review ,string close_path,
+										List<HtmlElement> result)
+		{
+			string _response = String.Empty;
+			int rand1 = 0;
+			//
+			string ofic_ = @"//div[contains(@class,'index_container')]/descendant::*/div[contains(@class,'index_comment')]";
+			string status_path = @"//div[contains(@class,'index_container')]/div[contains(text(),'Статус')]/../div[2]";
+			string path_for_process_name = @"//div[contains(text(),'Покупатель')]/following-sibling::*";
+			foreach(HtmlElement i in result)
+			{
+				i.Click();
+				act.WaitDownloading();
+				HtmlElement ofic = act.FindElementByXPath(ofic_,0);
+				//CHECK
+//				this.project.SendInfoToLog(ofic.InnerText);
+				//finde el 'Статус'
+				HtmlElement status = act.FindElementByXPath(status_path,0);
+				//CHECK
+//				this.project.SendInfoToLog(status.InnerText);
+				if(status.InnerText == "Обработаный" || ofic.InnerText != "")
+				{
+					this.FindElementClic(close_path,act);
+					act.WaitDownloading();
+					break;
+				}
+				else
+				{
+					//finde button 'Ответить'
+					this.FindElementClic(button_path,act);
+					act.WaitDownloading();
+					//finde field 'Ответить'
+					this.FindElementClic(field_path_review,act);
+					act.WaitDownloading();
+					HtmlElement button_review = act.FindElementByXPath(field_path_review,0);
+					if(how_many_stars == 5)
+					{
+						rand1 = this.rand.Next(1,this.packgage.ElementAt(2).Dimension.Rows);
+						_response = Convert.ToString(this.packgage.ElementAt(2).GetValue(rand1,1));//this.project.SendInfoToLog(Convert.ToString(Tabl.ElementAt(2).GetValue(rand1,1)));
+						this.ProcessName(path_for_process_name,ref _response);
+				    	button_review.SetValue($"{_response}","SuperEmulation");
+					}
+					else if(how_many_stars == 4)
+					{
+						rand1 = this.rand.Next(1,this.packgage.ElementAt(3).Dimension.Rows);
+						_response = Convert.ToString(this.packgage.ElementAt(3).GetValue(rand1,1));//this.project.SendInfoToLog(Convert.ToString(Tabl.ElementAt(3).GetValue(rand1,1)));
+						this.ProcessName(path_for_process_name,ref _response);
+				    	button_review.SetValue($"{_response}","SuperEmulation");
+					}
+					else if(how_many_stars == 3)
+					{
+						rand1 = this.rand.Next(1,this.packgage.ElementAt(4).Dimension.Rows);
+						_response = Convert.ToString(this.packgage.ElementAt(4).GetValue(rand1,1));//this.project.SendInfoToLog(Convert.ToString(Tabl.ElementAt(4).GetValue(rand1,1)));
+						this.ProcessName(path_for_process_name,ref _response);
+				    	button_review.SetValue($"{_response}","SuperEmulation");
+					}
+					//finde button 'отправить Ответ'
+					this.FindElementClic(button_send_review,act);
+					act.WaitDownloading();
+					this.FindElementClic(close_path,act);
+					act.WaitDownloading();
+					break;
+				}
+			}
+		}
+		internal void ProcessName(string xpath,ref string response)
+		{
+			HtmlElement _name = this.instance.ActiveTab.FindElementByXPath(xpath,0);
+			string reg = @"(?<=!)[\w\W]*";
+			if(_name.InnerText == "Пользователь предпочёл скрыть свои данные");
+			else
+			{
+				response = response.Split('!')[0] + $" , {_name.InnerText} !" + Regex.Match(response,reg);
+				this.project.SendInfoToLog(response);
+			}
+		}
+
+		/// <summary>
+		/// 
+		/// </summary>
+		/// <param name="Params">
+		/// xp_stars collection
+		/// xp_stars_child collection
+		/// xp_product collection
+		/// xp_status collection
+		/// xp_button_"Ответить"
+		/// xp_text_area
+		/// xp_button_send_review_"Отправить"
+		/// xp_close
+		/// regex_status
+		/// regex_count_stars
+		/// </param>
+		public void ProcessingAnswerReview(IZennoPosterProjectModel project,Tab act,params string [] xpath_regex)
+		{
+			string xp_stars_collection = String.Empty;
+			string xp_stars_child = String.Empty;
+			string xp_product_collection = String.Empty;
+			string xp_status_collection = String.Empty;
+			string xp_button/*Ответить*/ = String.Empty;
+			string field_path_review = String.Empty;
+			string xp_button_send_review/*Отправить*/ = String.Empty;
+			string xp_close = String.Empty;
+			string regex_status = String.Empty;
+			string regex_count_stars = String.Empty;
+			string path_dir = String.Empty;
+			HtmlElementCollection collection_reviews = null;
+			HtmlElementCollection collection_field_reviews = null;
+			HtmlElementCollection product = null;
+			HtmlElementCollection Status = null;			
+			for(int i = 0; i < xpath_regex.Length;i++)
+			{
+				switch(i)
+				{
+					case 0: xp_stars_collection = xpath_regex[i];break;
+					case 1: xp_stars_child = xpath_regex[i];break;
+					case 2: xp_product_collection = xpath_regex[i];break;
+					case 3: xp_status_collection = xpath_regex[i];break;
+					case 4: xp_button/*Ответить*/ = xpath_regex[i];break;
+					case 5: field_path_review = xpath_regex[i];break;
+					case 6: xp_button_send_review/*Отправить*/ = xpath_regex[i];break;
+					case 7: xp_close = xpath_regex[i];break;
+					case 8: regex_status = xpath_regex[i];break;
+					case 9: regex_count_stars = xpath_regex[i];break;
+					case 10: path_dir = xpath_regex[i];break;
+				}
+			}
+			try
+			{
+				//finde collection stars
+				collection_reviews = act.FindElementsByXPath(xp_stars_collection);
+				//finde collection_emphty_reviews
+				collection_field_reviews = act.FindElementsByXPath(xp_stars_child);
+				//finde collection product
+				product = act.FindElementsByXPath(xp_product_collection);
+				//define status collection
+				Status = act.FindElementsByXPath(xp_status_collection);
+			}
+			catch(Exception e)
+			{
+				throw new Exception("Error:not finde collection");
+			}
+			
+			
+			//_____________define element withous "star--sprite" and have in body-review is void,then macke event the click out this element______________
+			//count stars
+			//_______processing_____5_4_3_stars____________&&___________define_for_current_instatnce_num_working_page
+			this.CountStars(regex_count_stars,collection_reviews,regex_status,Status,collection_field_reviews,act,xp_button,
+							field_path_review,xp_button_send_review,xp_close);
+			}
+	 }
+	
+}
