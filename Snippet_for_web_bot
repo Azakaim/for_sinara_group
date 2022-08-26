@@ -1,0 +1,222 @@
+var auth_stat = project.Context["authorization_status"];
+if(auth_stat != null)return auth_stat.ToString();
+instance.ClearCache();
+instance.ClearCookie();
+var path_dir = project.Context["load_path_dir"];
+var mail_and_count = project.Context["mail_count"];
+string date_ = project.Variables["date_num"].Value ;
+string match_mail = String.Empty;
+int dimension_rows_mail = 0 ;
+int check_for_start = 0;
+
+//project.SendInfoToLog(mail_and_count);
+//_____________________________________________________LOAD PROFILE
+string check_load_pathdir = path_dir == null? "path_dir is VOID":"path_dir is OK";
+project.SendInfoToLog(check_load_pathdir,true);
+project.Profile.Load(path_dir);
+var act = instance.ActiveTab;
+CommonCode C_M = new CommonCode();
+C_M.project = project;
+C_M.instance = instance;
+
+//sleep download page
+int.TryParse(mail_and_count,out int num_sleep_thread);
+//______________________________________________________Thread Sleep
+////if(num_sleep_thread > 1)Thread.Sleep(num_sleep_thread * 5000);
+switch(num_sleep_thread)
+{
+	case 1:break;
+	case 2:Thread.Sleep(num_sleep_thread * 10000);break;
+	case 3:Thread.Sleep(num_sleep_thread * 8000);break;
+	case 4:Thread.Sleep(num_sleep_thread * 7000);break;
+	case 5:Thread.Sleep(num_sleep_thread * 6000);break;
+	case 6:Thread.Sleep(num_sleep_thread * 6000);break;
+	case 7:Thread.Sleep(num_sleep_thread * 6000);break;
+	case 8:Thread.Sleep(num_sleep_thread * 6000);break;
+	case 9:Thread.Sleep(num_sleep_thread * 5500);break;
+	case 10:Thread.Sleep(num_sleep_thread * 5300);break;
+	default:throw new Exception("you have exceeded the number of allowed accounts");break;
+}
+if(num_sleep_thread == 0){throw new Exception("Error:THREAD NOT SLEEP");}
+//_____________________________________________________________________
+
+//project.SendInfoToLog((num_sleep_thread * 10000).ToString());
+//determinate table Excel
+lock(SyncObjects.TableSyncer)
+{   //determinate Excel doc this instance
+	C_M.pack = new OfficeOpenXml.ExcelPackage(new FileInfo(project.Directory+"/Data for Ozon.xlsx"));
+	//table active
+	C_M.packgage = C_M.PackGage(7);
+	//__________________________________________________________________Click of count page
+	//define count page
+	dimension_rows_mail = Convert.ToInt32(C_M.packgage.ElementAt(5).GetValue(1,1));
+	match_mail = Regex.Match(path_dir,@"(?<=Accounts\\).*(?=\.zpprofile)").Value;
+	try
+	{
+		C_M.num = Convert.ToInt32(mail_and_count);
+		project.SendInfoToLog($"{match_mail} number:" + C_M.num.ToString(),true);
+	}//исправить обратно
+	catch(Exception e){throw new Exception(e.Message);}
+	project.SendInfoToLog(C_M.num.ToString());
+}
+//Active Tab && scroll sheet
+
+act.Navigate("https://seller.ozon.ru/app/main");
+
+act.WaitDownloading();
+//scroll sheet
+C_M.Scroll(act);
+//finde review
+string path_review = @"//a[@href='/app/reviews']|//a[9]|//div[contains(text(),'Отзывы')]/*";
+//status review
+string _status = String.Empty;
+act.WaitDownloading();
+string error_load_page = String.Empty;
+HtmlElement error_load;
+//create instance class Common Code
+C_M.FindElementClic(path_review,act);
+act.WaitDownloading();
+//finde element 'Не удалось загрузить модуль'
+do{
+//finde error load page
+error_load_page = @"//div[contains(@class,'index_errorWrapper')]/descendant::span[contains(text(),'Не удалось загрузить модуль')]";
+error_load = act.FindElementByXPath(error_load_page,0);
+if(!error_load.IsVoid)act.MainDocument.EvaluateScript("location.reload()");}while(!error_load.IsVoid);
+act.WaitDownloading();
+//scroll sheet
+C_M.Scroll(act);
+//finde element next_sheet_path
+string next_page = @"//div[contains(@class,'index_paging')]//*//following-sibling::*";
+string next_page_clic = @"//div[contains(@class,'index_paging')]//following-sibling::*[8]";
+
+while(true)
+{
+	act.WaitDownloading();
+	if( date_!= String.Empty)
+	{
+		//Exit by date
+		HtmlElementCollection exit_by_date = act.FindElementsByXPath(@"//tr//td[2]//*[1]/*[1]");
+//		foreach(var h in exit_by_date)project.SendInfoToLog(h.InnerText);
+		var exit = exit_by_date.Where(x=>x.InnerText == date_).ToList();
+		var exit_2 = exit_by_date.Where(x=> Convert.ToInt32(x.InnerText.Split('.')[0]) <= Convert.ToInt32(date_.Split('.')[0])).ToList();
+//		//TEST
+//		foreach(var l in exit_2)project.SendInfoToLog(l.InnerText.Split('.')[0]);
+		project.SendInfoToLog($"mail:{match_mail}\nthis my date:{date_.Split('.')[0]}\nstring date:{exit.Count.ToString()}\nint date:{exit_2.Count.ToString()}",true);
+		if(exit.Count != 0){project.SendInfoToLog("Exit by Date",true);return "Exit by Date";}
+	}
+
+	//_______________________________________________________________________________________________________________________________________
+    //finde collection stars
+	string coll_rating_cell = @"//table//tr[contains(@class,'index')]//td[contains(@class,'index')]//div[contains(@class,'rating-cell')]";
+ 	//finde collection_emphty_reviews
+	string children_path = @"//table//tr[contains(@class,'index')]//td[contains(@class,'index')]//div[contains(@class,'rating-cell')]/../following-sibling::td[1]/*";
+ 	//finde collection good
+	string path_good = @"//table//tr[contains(@class,'index')]//td[contains(@class,'index')]/*//a[contains(@target,'blank')]/div";
+    //define Package Table
+	string path_dirozondata = project.Directory + @"\Data for Ozon.xlsx";
+    _status = @"//tbody/*/child::*[3]";
+	//regex for regex 
+	string st_reg = @"(?<=""><div>)[\w\W]*?(?=</div></td>)";
+	//____________________________________________
+	//regex for count stars
+	string stars = @"(?<=<use\ href=""\#)[\w\W]*?(?=""></use>)";
+	//finde button 'Ответить'
+	string button_path = @"//span[contains(text(),'Ответить')]/..";
+	//finde field 'Ответить'
+	string field_path_review = @"//textarea";
+	//finde button 'отправить Ответ'
+	string button_send_review = @"//span[contains(text(),'Отправить ответ')]/..";
+	string close_path = @"//div[contains(@class,'vue-portal-target')]//div[contains(@class,'index_close_')]|//div[contains(@class,'index_close_1')]";
+	//Finds element for clic htmlelement
+	string clic_for_html_element = @"//span[contains(text(),'Загрузить ещё')]";
+	
+	//______Clic__for_html_element
+	int chec_clic_element = 0;
+	string str_for_write = String.Empty;
+	do{
+		C_M.Dict_for_common_html_el = C_M.Common_Ellement();
+		
+		lock(SyncObjects.TableSyncer)
+		{
+			if(C_M.num == 1)
+			{
+				//__start__element
+				C_M.Common_Ellement( ref str_for_write );
+				C_M.packgage.ElementAt(5).SetValue(1,2,str_for_write);
+				C_M.pack.Save();
+			}
+		}
+		#region test
+//		foreach(var po in C_M.Dict_for_common_html_el)project.SendInfoToLog($"key:{po.Key.ToString()} num:{C_M.num.ToString()}");
+		#endregion
+		//Generic code for defining the start element for all elements except the first
+		while(check_for_start == 0 && num_sleep_thread != 1)
+		{
+			//define start element for other strims
+			string hoop = C_M.packgage.ElementAt(5).GetValue(1,2).ToString().Split('/')[3];
+			//define product Id
+			var reg_id = Regex.Matches(hoop,@"[^\D]{5,}").GetEnumerator();
+			//define product Name
+			string prod_name_Excel = Regex.Matches(hoop,@"[^,]*")[0].Value;
+			string result_ID_excel = String.Empty;
+			while(reg_id.MoveNext())
+			result_ID_excel += reg_id.Current.ToString();
+			//project.SendInfoToLog(result_str_regex_ID);
+			//finde element in dictionary
+			
+			foreach(KeyValuePair<int,List<HtmlElement>> valueEl in C_M.Dict_for_common_html_el)
+			{
+				string compaper_name_Html = String.Empty;
+				string result_ID_Html = String.Empty;
+				for(int i = 3;i < valueEl.Value.Count;i++)
+				{
+					if(i == 3)
+					{
+						//project.SendInfoToLog(valueEl.Value[i].InnerText);
+						compaper_name_Html = Regex.Matches(valueEl.Value[i].InnerText,@"[^,]*")[0].Value;
+						var comparer_id = Regex.Matches(valueEl.Value[i].InnerText,@"[^\D]{5,}").GetEnumerator();
+						while(comparer_id.MoveNext())
+						result_ID_Html += comparer_id.Current.ToString();
+						//project.SendInfoToLog($"html: {compaper_name_Html} excel: {prod_name_Excel} \r html: {result_ID_Html} excel: {result_ID_excel}");
+						if((compaper_name_Html == prod_name_Excel) && (result_ID_Html == result_ID_excel))
+						{
+							C_M.num += (valueEl.Key - 1);
+							//project.SendInfoToLog(C_M.num.ToString());
+							check_for_start++;
+							break;
+						}
+						else break;
+					}
+				}
+				if(check_for_start != 0)break;
+			}
+			if(check_for_start == 0)
+			{
+				act.FindElementByXPath(clic_for_html_element,0).Click();
+				C_M.Dict_for_common_html_el = C_M.Common_Ellement();
+			}
+		}
+		chec_clic_element = C_M.Dict_for_common_html_el.Where(x=> x.Key == C_M.num && (x.Value != null)).Count();
+		if(chec_clic_element == 0)act.FindElementByXPath(clic_for_html_element,0).Click();
+		
+	}while(chec_clic_element == 0);
+	
+	
+	C_M.ProcessingAnswerReview( project,
+								act,
+								coll_rating_cell,
+								children_path,
+								path_good,
+								_status,
+								button_path,
+								field_path_review,
+								button_send_review,
+								close_path,
+								st_reg,
+								stars,path_dirozondata);
+	 lock(SyncObjects.TableSyncer)
+	{
+		 C_M.num = C_M.CountPageOfOzon(Convert.ToInt32(dimension_rows_mail));
+		 project.SendInfoToLog($"это число -- {C_M.num.ToString()}");
+	}
+}
