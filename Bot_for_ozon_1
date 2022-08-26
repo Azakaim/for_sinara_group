@@ -1,0 +1,375 @@
+ //Excel define
+//_________________________________________________________________________________________________________________________________________________________________________________________________________________________________________
+
+if(project.Variables["autorize"].Value.Contains("False"))return"";
+//объявляем табличку и лист данные
+string path_direct_data_autorized = "/Data for Ozon.xlsx";
+string mail_and_count = String.Empty;
+int count_ = 0;
+lock(SyncObjects.TableSyncer)
+	{
+		var PackGage = new ExcelPackage(new FileInfo(project.Directory+path_direct_data_autorized));
+		//define array excel worksheet 
+		ExcelWorksheet [] Table_data = new ExcelWorksheet []
+		{
+			PackGage.Workbook.Worksheets[1],//data autorized
+			PackGage.Workbook.Worksheets[2],//autorized 
+			PackGage.Workbook.Worksheets[3],//5 stars review
+			PackGage.Workbook.Worksheets[4],//4 stars review
+			PackGage.Workbook.Worksheets[5],//3 stars review
+			PackGage.Workbook.Worksheets[6],//count rows table mail
+			PackGage.Workbook.Worksheets[7]//working 
+		};
+		//define list for save data and mutable value string
+		Dictionary<string,string> account_autorized = new Dictionary<string,string>();
+		CommonCode CM = new CommonCode();
+		for(int i = 1;i <= Table_data[0].Dimension.Rows;i++)
+		{
+			project.SendInfoToLog(Table_data[0].Dimension.Rows.ToString());
+			var str_val_one = Table_data[0].GetValue(1,1);
+			var str_val = Table_data[0].GetValue(i,1);
+			if(str_val == null || str_val.ToString() == String.Empty)break;
+			else if(str_val_one == null )throw new Exception("NO STRING FOR AUTORIZATION ACCOUNT");
+			//check for NULL
+			var empty_row = Table_data[1].GetValue(i,1);
+			if(empty_row == null)
+			{
+				mail_and_count = str_val.ToString().Split('/')[0]+" "+i.ToString();
+				Table_data[1].SetValue(i,1,mail_and_count);
+				Table_data[5].SetValue(1,1,mail_and_count.Split(' ')[1]);
+			}
+			else
+			{
+				for(int y = 1;y <= Table_data[1].Dimension.Rows;y++)
+				{
+					if( Table_data[1].GetValue(y,1) != null)count_++;
+				}
+				mail_and_count = str_val.ToString().Split('/')[0]+" "+(Convert.ToInt32(count_.ToString())+i).ToString();
+				Table_data[1].SetValue(Convert.ToInt32(count_.ToString())+i,1,mail_and_count);
+				Table_data[5].SetValue(1,1,mail_and_count.Split(' ')[1]);
+			}
+////			//project.SendInfoToLog(Table_data[0].Dimension.Rows.ToString());
+////			string str_val = String.Empty;
+////			//check for string empty Table_data[0] => Data Autorized account
+////			var str_value = Table_data[0].GetValue(i,1);
+////			int count_ = Table_data[1].Dimension.End.Row;
+////			//check for string empty Table_data[1] => Autorized account
+////			var check = Table_data[1].GetValue(i,1);
+////			var check_1 =  Table_data[0].GetValue(1,1);
+////			var opo = Table_data[1].GetHashCode();
+////			if(check_1 == String.Empty)throw new Exception("NO STRING FOR AUTORIZATION ACCOUNT");
+////			if(str_value != null)
+////			{
+////				//set string empty in excel table
+////				str_val = str_value.ToString();
+////				if(str_val == String.Empty)continue;
+////				else if(check == null && str_val == String.Empty)continue;
+////				Table_data[0].SetValue(i,1,"");
+////				//set string autorized email
+////				if(count_ != 0)
+////				for(int y = 1;y <= Table_data[1].Dimension.End.Row;y++)
+////				{
+////					if(Table_data[1].GetValue(y,1).ToString() == String.Empty)
+////					{
+////					mail_and_count = str_val.Split('/')[0]+" "+i.ToString();
+////					Table_data[1].SetValue(i,1,mail_and_count);
+////					Table_data[5].SetValue(1,1,mail_and_count.Split(' ')[1]);
+////					}
+////				}
+			    Table_data[0].SetValue(i,1,"");//if delete  == crach table
+				//key & value
+				account_autorized.Add(str_val.ToString().Split('/')[0],str_val.ToString().Split('/')[1]);
+				//save mutable value in current table excel
+				PackGage.Save();
+		}
+		//project.SendInfoToLog( account_autorized.Count.ToString());
+		if(account_autorized == null)throw new Exception("NO STRING FOR AUTORIZATION ACCOUNT");
+		project.Context["acc_autorized"] =  account_autorized;
+	}
+	
+	                                                                                    //Autorization account
+//_________________________________________________________________________________________________________________________________________________________________________________________________________________________________________
+var account_autorized = project.Context["acc_autorized"];
+//checing for empty variables mail & pass
+string mail_ozon = String.Empty;
+string pass_ozon = String.Empty;
+string mail_and_count = String.Empty;
+int dimension_rows_mail = 0;																					 
+//path dirrectory and save profile
+string path_dir = String.Empty;
+string used_path = String.Empty;
+//signin mail and pass
+CommonCode C_M = new CommonCode(); 
+//regex for check exists mail
+string regex = 	@"[\w\W]*?(?=\.zpprofile)";
+//string mail_zpprof = Regex.Matches
+string path_dir_zpprof = project.Directory + @"\Accounts";
+string path_dir_used = project.Directory + @"\Used Accounts";																					 
+//define pacgage excel
+OfficeOpenXml.ExcelPackage pack = null;	
+OfficeOpenXml.ExcelWorksheet Table = null;
+OfficeOpenXml.ExcelWorksheet Table_working = null;
+	if(!File.Exists(project.Directory+@"\Data for Ozon.xlsx"))throw new Exception("Error:not found Data for Ozon.xlsx");
+	else if(account_autorized == null)
+	{
+		lock(SyncObjects.TableSyncer)
+			{
+				pack = new OfficeOpenXml.ExcelPackage(new FileInfo(project.Directory+"/Data for Ozon.xlsx"));
+				Table = pack.Workbook.Worksheets[2];
+				Table_working = pack.Workbook.Worksheets[7];
+//				project.SendInfoToLog(dimension_rows_mail.ToString());
+				for(int i = 1;i<=Table.Dimension.Rows;i++)
+				{
+					if(Table.GetValue(i,1).ToString() == "")continue;
+					path_dir = path_dir_zpprof + @"\"+ Table.GetValue(i,1).ToString().Split(' ')[0] + @".zpprofile";
+					used_path = path_dir_used + @"\"+ Table.GetValue(i,1).ToString().Split(' ')[0] + @".zpprofile";
+					//define mail_count
+					mail_and_count = Table.GetValue(i,1).ToString().Split(' ')[1];
+					//set value in table working account
+					Table_working.SetValue(Convert.ToInt32(mail_and_count),1,Table.GetValue(i,1).ToString());
+					Table.DeleteRow(i);
+					//move the file to new dirrectory 
+					FileSystem.FileCopy(path_dir,used_path);
+					//delite the file old dir
+					File.Delete(path_dir);break;
+				}
+				pack.Save();
+		   }
+	}
+	//if(!Directory.Exists(path_dir_used) && !Directory.Exists(path_dir_zpprof))throw new Exception("Error:NOT FOUND DIRECTORY FOR FILES");
+	if(Directory.EnumerateFiles(path_dir_used).Count() > 0)
+	{
+		//load profile
+		if(File.Exists(used_path))
+		{ 
+			project.Context["load_path_dir"] = used_path;
+			project.Context["mail_count"] = mail_and_count;
+			return"";
+		}
+		else
+		{
+			throw new Exception("Error:mail value or pass value is empty");
+		    //Info output
+			Global.SpecialForms.AlertNotificator.Instance.DisplayAlert ("Error:mail value or pass value is empty");
+		}
+	}
+	else
+	{
+		
+		while(account_autorized.Count != 0)
+		{
+			foreach(var i in account_autorized)
+			{
+				mail_ozon = i.Key;
+				pass_ozon = i.Value;
+				account_autorized.Remove(mail_ozon);
+				break;
+			}
+			//path dirrectory and save profile
+			path_dir = path_dir_zpprof + @"\" + $"{mail_ozon}.zpprofile";
+			instance.ClearCache();
+			instance.ClearCookie();
+			//Tab active
+			var act = instance.ActiveTab;
+			//Html elements
+			HtmlElement input;
+			HtmlElement mail_input;
+			//x-path
+			string path_mail = @"//input[1][contains(@name,'email')]";
+			string path_pass = @"//input[1][contains(@name,'password')]";
+			string path_button = @"//button/div[contains(@class,'button-modul')]/*[1][contains(text(),'Войти')]";
+			//Input Ozon
+			act.Navigate("https://seller.ozon.ru/app/signin");
+			act.WaitDownloading();
+			Thread.Sleep(5000);
+			//first login in Ozon
+			if(mail_ozon!=String.Empty && pass_ozon!=String.Empty)
+			{
+				if(File.Exists(path_dir));
+				else
+				{
+					C_M.FindElementClic(path_mail,act,mail_ozon );
+					C_M.FindElementClic(path_pass,act,pass_ozon );
+					C_M.FindElementClic(path_button,act);
+					//check for good end
+					act.WaitDownloading();Thread.Sleep(5000);
+					HtmlElement mail_inp = act.FindElementByXPath(path_mail,0);
+					HtmlElement pass_inp = act.FindElementByXPath(pass_ozon,0);
+					if(!mail_inp.IsVoid || !pass_inp.IsVoid)
+					{
+						throw new Exception("Error:incorrect input,mail or pass incorrectli entered");
+						//Info output
+						Global.SpecialForms.AlertNotificator.Instance.DisplayAlert("Error:incorrect input,mail or pass incorrectli entered");
+					}
+					//if all good save profile
+					else if(!File.Exists(path_dir)) project.Profile.Save(path_dir,false,true,true,true,true,true,true,true,true);
+				}
+				
+			}
+		}
+	}
+	string auth_stat = "Authorization STATUS:OK";
+	project.Context["authorization_status"] = auth_stat;
+	
+	//____________________________________________________________________________________3 Cube
+var auth_stat = project.Context["authorization_status"];
+if(auth_stat != null)return auth_stat.ToString();
+instance.ClearCache();
+instance.ClearCookie();
+var path_dir = project.Context["load_path_dir"];
+var mail_and_count = project.Context["mail_count"];
+string date_ = project.Variables["date_num"].Value ;
+int dimension_rows_mail = 0 ;
+//num page
+string number_page_use = project.Variables["num_page"].Value;
+//project.SendInfoToLog(mail_and_count);
+//_____________________________________________________LOAD PROFILE
+string check_load_pathdir = path_dir == null? "path_dir is VOID":"path_dir is OK";
+project.SendInfoToLog(check_load_pathdir,true);
+project.Profile.Load(path_dir);
+var act = instance.ActiveTab;
+CommonCode C_M = new CommonCode();
+C_M.project = project;
+C_M.instance = instance;
+
+//sleep download page
+int.TryParse(mail_and_count,out int num_sleep_thread);
+//______________________________________________________Thread Sleep
+////if(num_sleep_thread > 1)Thread.Sleep(num_sleep_thread * 5000);
+switch(num_sleep_thread)
+{
+	case 1:break;
+	case 2:Thread.Sleep(num_sleep_thread * 10000);break;
+	case 3:Thread.Sleep(num_sleep_thread * 8000);break;
+	case 4:Thread.Sleep(num_sleep_thread * 7000);break;
+	case 5:Thread.Sleep(num_sleep_thread * 6000);break;
+	default:throw new Exception("you have exceeded the number of allowed accounts");break;
+}
+if(num_sleep_thread == 0){throw new Exception("Error:THREAD NOT SLEEP");}
+//_____________________________________________________________________
+
+//project.SendInfoToLog((num_sleep_thread * 10000).ToString());
+//determinate table Excel
+lock(SyncObjects.TableSyncer)
+{   //determinate Excel doc this instance
+	C_M.pack = new OfficeOpenXml.ExcelPackage(new FileInfo(project.Directory+"/Data for Ozon.xlsx"));
+	//table active
+	C_M.packgage = C_M.PackGage(7);
+	//__________________________________________________________________Click of count page
+	//define count page
+	dimension_rows_mail = Convert.ToInt32(C_M.packgage.ElementAt(5).GetValue(1,1));
+	string match_mail = Regex.Match(path_dir,@"(?<=Accounts\\).*(?=\.zpprofile)").Value;
+	try{C_M.num = Convert.ToInt32(mail_and_count);project.SendInfoToLog($"{match_mail} number:" + C_M.num.ToString(),true);}//исправить обратно
+	catch(Exception e){throw new Exception(e.Message);}
+	project.SendInfoToLog(C_M.num.ToString());
+}
+//Active Tab && scroll sheet
+act.Navigate("https://seller.ozon.ru/app/main");
+act.WaitDownloading();
+//scroll sheet
+C_M.Scroll(act);
+//finde review
+string path_review = @"//a[@href='/app/reviews']|//a[9]|//div[contains(text(),'Отзывы')]/*";
+//status review
+string _status = String.Empty;
+act.WaitDownloading();
+string error_load_page = String.Empty;
+HtmlElement error_load;
+//create instance class Common Code
+C_M.FindElementClic(path_review,act);
+act.WaitDownloading();
+//finde element 'Не удалось загрузить модуль'
+do{
+//finde error load page
+error_load_page = @"//div[contains(@class,'index_errorWrapper')]/descendant::span[contains(text(),'Не удалось загрузить модуль')]";
+error_load = act.FindElementByXPath(error_load_page,0);
+if(!error_load.IsVoid)act.MainDocument.EvaluateScript("location.reload()");}while(!error_load.IsVoid);
+act.WaitDownloading();
+//scroll sheet
+C_M.Scroll(act);
+//finde element next_sheet_path
+string next_page = @"//div[contains(@class,'index_paging')]//*//following-sibling::*";
+string next_page_clic = @"//div[contains(@class,'index_paging')]//following-sibling::*[8]";
+//page select user
+if(number_page_use != String.Empty)
+{
+	if(int.TryParse(number_page_use,out int number_page) == false)
+	{
+		throw new Exception("PAGE NOT FOUNDET");
+	}
+	else
+	{
+		HtmlElement max_page = act.FindElementByXPath(@"//div[contains(@class,'index_paging')]//following-sibling::*[7]",0);
+		project.SendInfoToLog(max_page.InnerText);
+		int max_count = Convert.ToInt32(max_page.InnerText);
+		if(number_page > max_count)throw new Exception("PAGE NOT FOUNDET");
+	}
+	C_M.num += number_page - 1;
+}
+while(true)
+{
+	//finde element next_sheet_path
+	List<HtmlElement> chec_count = null;
+	HtmlElement next_page_clic_go = act.FindElementByXPath(next_page_clic,0);
+	HtmlElementCollection page_count = act.FindElementsByXPath(next_page);
+	do
+	{	
+		chec_count = page_count.Where(x=>x.InnerText == Convert.ToString(C_M.num)).ToList();
+//		project.SendInfoToLog("this chec count page num:" + chec_count.Count.ToString());
+		if(chec_count.Count == 0)next_page_clic_go.Click();
+	}while(chec_count.Count == 0);
+	foreach(HtmlElement val in page_count)
+	{
+//		project.SendInfoToLog("inner_txt:"+val.InnerText);project.SendInfoToLog("num:"+Convert.ToString(num));
+		if(Convert.ToString(C_M.num) == val.InnerText){val.Click();act.WaitDownloading();break;}
+	}
+	//_______________________________________________________________________________________________________________________________________
+    //finde collection stars
+	string coll_rating_cell = @"//table//tr[contains(@class,'index')]//td[contains(@class,'index')]//div[contains(@class,'rating-cell')]";
+ 	//finde collection_emphty_reviews
+	string children_path = @"//table//tr[contains(@class,'index')]//td[contains(@class,'index')]//div[contains(@class,'rating-cell')]/../following-sibling::td[1]/*";
+ 	//finde collection good
+	string path_good = @"//table//tr[contains(@class,'index')]//td[contains(@class,'index')]/*//a[contains(@target,'blank')]/div";
+    //define Package Table
+	string path_dirozondata = project.Directory + @"\Data for Ozon.xlsx";
+    _status = @"//tbody/*/child::*[3]";
+	//regex for regex 
+	string st_reg = @"(?<=""><div>)[\w\W]*?(?=</div></td>)";
+	//____________________________________________
+	//regex for count stars
+	string stars = @"(?<=><use\ href=""\#)[\w\W]*?(?=""></use><)";
+	//finde button 'Ответить'
+	string button_path = @"//span[contains(text(),'Ответить')]/..";
+	//finde field 'Ответить'
+	string field_path_review = @"//textarea";
+	//finde button 'отправить Ответ'
+	string button_send_review = @"//span[contains(text(),'Отправить ответ')]/..";
+	string close_path = @"//div[contains(@class,'vue-portal-target')]//div[contains(@class,'index_close_')]|//div[contains(@class,'index_close_1')]";
+	C_M.ProcessingAnswerReview( project,
+								act,
+								coll_rating_cell,
+								children_path,
+								path_good,
+								_status,
+								button_path,
+								field_path_review,
+								button_send_review,
+								close_path,
+								st_reg,
+								stars,path_dirozondata);
+	 lock(SyncObjects.TableSyncer)
+	{
+		 C_M.num = C_M.CountPageOfOzon(Convert.ToInt32(dimension_rows_mail));
+		 //project.SendInfoToLog(num.ToString());
+	}
+	
+	if( date_!= String.Empty)
+	{
+		//Exit by date
+		HtmlElementCollection exit_by_date = act.FindElementsByXPath(@"//tr//td[2]//*[1]/*[1]");
+//		foreach(var h in exit_by_date)project.SendInfoToLog(h.InnerText);
+		var exit = exit_by_date.Where(x=>x.InnerText == date_).ToList();
+		if(exit.Count != 0){project.SendInfoToLog("Exit by Date",true);return "Exit by Date";}
+	}
+	
+}
